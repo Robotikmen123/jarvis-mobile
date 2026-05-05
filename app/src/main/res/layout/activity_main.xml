@@ -1,74 +1,123 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
     android:background="@color/bg">
 
+    <!-- Full-screen animated HUD -->
     <com.jarvis.mobile.ui.HudView
         android:id="@+id/hud"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1" />
+        android:layout_height="match_parent"
+        android:background="@color/bg" />
 
-    <TextView
-        android:id="@+id/logView"
-        android:layout_width="match_parent"
-        android:layout_height="170dp"
-        android:padding="10dp"
-        android:textSize="11sp"
-        android:textColor="@color/text"
-        android:fontFamily="monospace"
-        android:scrollbars="vertical"
-        android:background="@color/panel" />
-
+    <!-- Bottom overlay panel -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:padding="6dp"
-        android:background="@color/panel2">
+        android:layout_gravity="bottom"
+        android:orientation="vertical">
 
-        <EditText
-            android:id="@+id/input"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content"
-            android:hint="Metinle konus..."
-            android:textColor="@color/text"
-            android:textColorHint="@color/textDim"
-            android:inputType="text"
-            android:imeOptions="actionSend" />
-        <Button
-            android:id="@+id/sendBtn"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="GONDER"
-            android:textColor="#000d14"
-            android:backgroundTint="@color/primary" />
+        <!-- Separator line -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#660D3347" />
+
+        <!-- Log terminal -->
+        <TextView
+            android:id="@+id/logView"
+            android:layout_width="match_parent"
+            android:layout_height="110dp"
+            android:padding="8dp"
+            android:textSize="10sp"
+            android:textColor="#6688FCFF"
+            android:fontFamily="monospace"
+            android:scrollbars="vertical"
+            android:background="#D800060A" />
+
+        <!-- Separator -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#AA0D3347" />
+
+        <!-- Text input row -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="46dp"
+            android:orientation="horizontal"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:paddingTop="5dp"
+            android:paddingBottom="5dp"
+            android:background="#EE000810">
+
+            <EditText
+                android:id="@+id/input"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="36dp"
+                android:hint="// konuş..."
+                android:textColor="#8FFCFF"
+                android:textColorHint="#3A8A9A"
+                android:textSize="13sp"
+                android:fontFamily="monospace"
+                android:background="#22007a99"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:inputType="text"
+                android:imeOptions="actionSend" />
+
+            <Button
+                android:id="@+id/sendBtn"
+                android:layout_width="60dp"
+                android:layout_height="36dp"
+                android:text="▶"
+                android:textSize="16sp"
+                android:textColor="#000d14"
+                android:backgroundTint="#00D4FF"
+                android:layout_marginStart="6dp" />
+        </LinearLayout>
+
+        <!-- Separator -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#AA0D3347" />
+
+        <!-- Control buttons -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:orientation="horizontal"
+            android:background="#EE000810">
+
+            <Button
+                android:id="@+id/muteBtn"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="match_parent"
+                android:text="🎙 MIC"
+                android:textSize="12sp"
+                android:textColor="#00D4FF"
+                android:background="@android:color/transparent" />
+
+            <View
+                android:layout_width="1dp"
+                android:layout_height="match_parent"
+                android:background="#330D3347" />
+
+            <Button
+                android:id="@+id/settingsBtn"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="match_parent"
+                android:text="⚙  SETTINGS"
+                android:textSize="12sp"
+                android:textColor="#3A8A9A"
+                android:background="@android:color/transparent" />
+        </LinearLayout>
+
     </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:background="@color/panel">
-
-        <Button
-            android:id="@+id/muteBtn"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content"
-            android:text="🎙 SESI KAPAT"
-            android:textColor="@color/primary"
-            android:background="@color/panel" />
-        <Button
-            android:id="@+id/settingsBtn"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content"
-            android:text="⚙ AYARLAR"
-            android:textColor="@color/textDim"
-            android:background="@color/panel" />
-    </LinearLayout>
-</LinearLayout>
+</FrameLayout>
