@@ -1,6 +1,8 @@
 package com.jarvis.mobile.ui
 
 import android.Manifest
+import android.app.WallpaperManager
+import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -17,6 +19,8 @@ import com.jarvis.mobile.R
 import com.jarvis.mobile.config.ConfigStore
 import com.jarvis.mobile.live.LiveSession
 import com.jarvis.mobile.service.JarvisService
+import com.jarvis.mobile.ui.HudStateHolder
+import com.jarvis.mobile.wallpaper.JarvisWallpaperService
 
 class MainActivity : AppCompatActivity(), LiveSession.Callbacks {
 
@@ -65,6 +69,9 @@ class MainActivity : AppCompatActivity(), LiveSession.Callbacks {
         findViewById<Button>(R.id.settingsBtn).setOnClickListener {
             startActivity(Intent(this, SetupActivity::class.java))
         }
+        findViewById<Button>(R.id.wallpaperBtn).setOnClickListener {
+            launchLiveWallpaperPicker()
+        }
 
         ensurePermissionsAndStart()
     }
@@ -90,7 +97,31 @@ class MainActivity : AppCompatActivity(), LiveSession.Callbacks {
     }
 
     override fun onState(state: LiveSession.State) {
+        HudStateHolder.state = state
         runOnUiThread { hud.state = state }
+    }
+
+    private fun launchLiveWallpaperPicker() {
+        val cn = ComponentName(this, JarvisWallpaperService::class.java)
+        val ok = runCatching {
+            val intent = Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER).apply {
+                putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT, cn)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            startActivity(intent)
+            true
+        }.getOrDefault(false)
+        if (!ok) {
+            // Fallback: open the system live-wallpaper chooser
+            runCatching {
+                startActivity(Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            }.onFailure {
+                Toast.makeText(this,
+                    "Canli duvar kagidi acilamadi. Telefon Ayarlar > Duvar kagidi > Canli > JARVIS",
+                    Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     override fun onLog(line: String) {

@@ -109,6 +109,21 @@
                 android:background="#330D3347" />
 
             <Button
+                android:id="@+id/wallpaperBtn"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="match_parent"
+                android:text="🖼 WALLPAPER"
+                android:textSize="12sp"
+                android:textColor="#00FF88"
+                android:background="@android:color/transparent" />
+
+            <View
+                android:layout_width="1dp"
+                android:layout_height="match_parent"
+                android:background="#330D3347" />
+
+            <Button
                 android:id="@+id/settingsBtn"
                 android:layout_width="0dp"
                 android:layout_weight="1"
