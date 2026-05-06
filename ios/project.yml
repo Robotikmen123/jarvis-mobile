@@ -1,0 +1,32 @@
+name: Jarvis
+options:
+  bundleIdPrefix: com.jarvis
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    CODE_SIGN_STYLE: Automatic
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    TARGETED_DEVICE_FAMILY: "1"
+    IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+    ENABLE_BITCODE: NO
+
+targets:
+  Jarvis:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources
+      - path: Resources/prompt.txt
+        type: file
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.jarvis.mobile
+        INFOPLIST_FILE: Resources/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Resources/Jarvis.entitlements
+        UI_SUPPORTED_INTERFACE_ORIENTATIONS: "UIInterfaceOrientationPortrait"

@@ -16,3 +16,12 @@ local.properties
 *.class
 *.log
 .kotlin/
+
+# iOS / Xcode
+ios/Jarvis.xcodeproj/
+ios/Jarvis.xcworkspace/
+ios/build/
+ios/DerivedData/
+ios/*.ipa
+xcuserdata/
+*.xcuserstate
