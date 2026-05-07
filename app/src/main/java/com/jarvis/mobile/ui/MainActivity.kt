@@ -6,8 +6,12 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.text.method.ScrollingMovementMethod
+import android.view.View
+import android.view.animation.DecelerateInterpolator
+import android.view.animation.OvershootInterpolator
 import android.widget.Button
 import android.widget.EditText
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -25,6 +29,7 @@ class MainActivity : AppCompatActivity(), LiveSession.Callbacks {
     private lateinit var input: EditText
     private lateinit var sendBtn: Button
     private lateinit var muteBtn: Button
+    private lateinit var bottomPanel: LinearLayout
     private val logBuffer = StringBuilder()
     private var session: LiveSession? = null
 
@@ -44,12 +49,14 @@ class MainActivity : AppCompatActivity(), LiveSession.Callbacks {
             return
         }
         setContentView(R.layout.activity_main)
-        hud      = findViewById(R.id.hud)
-        logView  = findViewById(R.id.logView)
-        input    = findViewById(R.id.input)
-        sendBtn  = findViewById(R.id.sendBtn)
-        muteBtn  = findViewById(R.id.muteBtn)
+        hud         = findViewById(R.id.hud)
+        logView     = findViewById(R.id.logView)
+        input       = findViewById(R.id.input)
+        sendBtn     = findViewById(R.id.sendBtn)
+        muteBtn     = findViewById(R.id.muteBtn)
+        bottomPanel = findViewById(R.id.bottomPanel)
         logView.movementMethod = ScrollingMovementMethod()
+        playEntryAnimation()
 
         sendBtn.setOnClickListener {
             val t = input.text.toString().trim()
@@ -106,6 +113,27 @@ class MainActivity : AppCompatActivity(), LiveSession.Callbacks {
             logView.text = logBuffer.toString()
             logView.scrollTo(0, Int.MAX_VALUE)
         }
+    }
+
+    private fun playEntryAnimation() {
+        // Bottom panel: hidden, slides up after the HUD boot intro finishes (~3s).
+        bottomPanel.alpha = 0f
+        bottomPanel.translationY = 800f
+        bottomPanel.animate()
+            .translationY(0f).alpha(1f)
+            .setStartDelay(2700)
+            .setDuration(620)
+            .setInterpolator(DecelerateInterpolator(1.6f))
+            .start()
+
+        // Send button: pop in with overshoot
+        sendBtn.scaleX = 0f; sendBtn.scaleY = 0f
+        sendBtn.animate()
+            .scaleX(1f).scaleY(1f)
+            .setStartDelay(3100)
+            .setDuration(380)
+            .setInterpolator(OvershootInterpolator(2.4f))
+            .start()
     }
 
     override fun onDestroy() {

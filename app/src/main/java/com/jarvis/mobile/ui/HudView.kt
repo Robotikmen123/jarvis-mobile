@@ -13,7 +13,15 @@ class HudView @JvmOverloads constructor(
 ) : View(ctx, attrs) {
 
     @Volatile var state: LiveSession.State = LiveSession.State.IDLE
+        set(value) {
+            if (value != field) {
+                prevColor = currentColor
+                colorTweenStart = System.currentTimeMillis()
+            }
+            field = value
+        }
 
+    // ── Paints ──────────────────────────────────────────────────────────
     private val pStroke = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     private val pFill   = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val pText   = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Typeface.MONOSPACE }
@@ -21,84 +29,300 @@ class HudView @JvmOverloads constructor(
         typeface = Typeface.MONOSPACE; textAlign = Paint.Align.CENTER; isFakeBoldText = true
     }
 
+    // ── Animation state ────────────────────────────────────────────────
     private var tick = 0
     private var pulse = 0f
     private var scanAngle = 0f
     private val ringAngles = FloatArray(5) { it * 72f }
-
-    private val waveform = FloatArray(32) { 0f }
+    private val waveform = FloatArray(48) { 0f }
     private var waveIdx = 0
 
+    // ── Boot intro ─────────────────────────────────────────────────────
+    private val bootStartMs = System.currentTimeMillis()
+    private val bootDurationMs = 3000L
+    private val bootMessages = listOf(
+        "▶ NEURAL CORE      INITIALIZING",
+        "▶ MEMORY MATRIX    LOADED",
+        "▶ AUDIO PIPELINE   ONLINE",
+        "▶ GEMINI 2.5 LINK  HANDSHAKE OK",
+        "▶ TOOL ARRAY       ARMED",
+        "▶ J.A.R.V.I.S.     ONLINE."
+    )
+
+    // ── Color tweening ─────────────────────────────────────────────────
+    private var prevColor: Int = 0xFF3A8A9A.toInt()
+    private var currentColor: Int = 0xFF3A8A9A.toInt()
+    private var colorTweenStart: Long = 0L
+    private val colorTweenMs = 420L
+
+    // ── Particles / waves / arcs ───────────────────────────────────────
     private data class Spark(var x: Float, var y: Float, var vx: Float, var vy: Float, var life: Float)
     private val sparks = mutableListOf<Spark>()
 
-    // Updated each frame so the animation loop can spawn sparks at the right position
+    private data class PulseWave(var r: Float, var alpha: Float, var width: Float)
+    private val pulseWaves = mutableListOf<PulseWave>()
+    private var lastPulseTick = -100
+
+    private data class OrbitDot(var ang: Float, var rad: Float, var speed: Float, var life: Float)
+    private val orbits = mutableListOf<OrbitDot>()
+
+    private data class DataDigit(var x: Float, var y: Float, var ch: Char, var alpha: Int, var fall: Float, var size: Float)
+    private val edgeDigits = mutableListOf<DataDigit>()
+    private val hexChars = "0123456789ABCDEF".toCharArray()
+
+    private data class Arc(var x1: Float, var y1: Float, var x2: Float, var y2: Float, var life: Float, val seed: Int)
+    private val arcs = mutableListOf<Arc>()
+
+    // ── Geometry caches (set in onDraw) ───────────────────────────────
     private var cx = 0f; private var cy = 0f; private var baseR = 0f
 
     init {
         postOnAnimation(object : Runnable {
-            override fun run() {
-                tick++
-                pulse = ((sin(tick * 0.05) + 1.0) * 0.5).toFloat()
-                val spd = if (state == LiveSession.State.SPEAKING) 3.5f else 1f
-                ringAngles[0] = (ringAngles[0] + 0.6f  * spd) % 360f
-                ringAngles[1] = (ringAngles[1] - 1.0f  * spd + 360f) % 360f
-                ringAngles[2] = (ringAngles[2] + 1.7f  * spd) % 360f
-                ringAngles[3] = (ringAngles[3] - 0.4f  * spd + 360f) % 360f
-                ringAngles[4] = (ringAngles[4] + 2.3f  * spd) % 360f
-                scanAngle = (scanAngle + if (state == LiveSession.State.THINKING) 4f else 1.8f) % 360f
-
-                val active = state == LiveSession.State.LISTENING || state == LiveSession.State.SPEAKING
-                waveform[waveIdx % 32] = if (active) Random.nextFloat() * 0.85f + 0.1f
-                                         else (waveform[waveIdx % 32] * 0.80f)
-                waveIdx++
-
-                if (state == LiveSession.State.SPEAKING && tick % 2 == 0 && baseR > 0f) {
-                    repeat(2) {
-                        val ang = Random.nextDouble(0.0, 2 * PI).toFloat()
-                        val sr = baseR * 0.54f
-                        sparks += Spark(
-                            cx + cos(ang) * sr, cy + sin(ang) * sr,
-                            cos(ang) * (3f + Random.nextFloat() * 7f),
-                            sin(ang) * (3f + Random.nextFloat() * 7f) - 1f,
-                            1f
-                        )
-                    }
-                }
-                val it = sparks.iterator()
-                while (it.hasNext()) {
-                    val s = it.next()
-                    s.x += s.vx; s.y += s.vy; s.vy += 0.25f
-                    s.life -= 0.04f
-                    if (s.life <= 0f) it.remove()
-                }
-
-                invalidate()
-                postOnAnimation(this)
-            }
+            override fun run() { step(); invalidate(); postOnAnimation(this) }
         })
     }
 
+    // ── Animation step ────────────────────────────────────────────────
+    private fun step() {
+        tick++
+        pulse = ((sin(tick * 0.05) + 1.0) * 0.5).toFloat()
+
+        val spd = if (state == LiveSession.State.SPEAKING) 3.5f else 1f
+        ringAngles[0] = (ringAngles[0] + 0.6f * spd) % 360f
+        ringAngles[1] = (ringAngles[1] - 1.0f * spd + 360f) % 360f
+        ringAngles[2] = (ringAngles[2] + 1.7f * spd) % 360f
+        ringAngles[3] = (ringAngles[3] - 0.4f * spd + 360f) % 360f
+        ringAngles[4] = (ringAngles[4] + 2.3f * spd) % 360f
+        scanAngle = (scanAngle + if (state == LiveSession.State.THINKING) 4f else 1.8f) % 360f
+
+        val active = state == LiveSession.State.LISTENING || state == LiveSession.State.SPEAKING
+        waveform[waveIdx % 48] = if (active) Random.nextFloat() * 0.85f + 0.1f
+                                 else (waveform[waveIdx % 48] * 0.80f)
+        waveIdx++
+
+        // Sparks during SPEAKING
+        if (state == LiveSession.State.SPEAKING && tick % 2 == 0 && baseR > 0f) {
+            repeat(2) {
+                val ang = Random.nextDouble(0.0, 2 * PI).toFloat()
+                val sr = baseR * 0.54f
+                sparks += Spark(
+                    cx + cos(ang) * sr, cy + sin(ang) * sr,
+                    cos(ang) * (3f + Random.nextFloat() * 7f),
+                    sin(ang) * (3f + Random.nextFloat() * 7f) - 1f,
+                    1f
+                )
+            }
+        }
+        for (s in sparks) { s.x += s.vx; s.y += s.vy; s.vy += 0.25f; s.life -= 0.04f }
+        sparks.removeAll { it.life <= 0f }
+
+        // Pulse waves emanating from core
+        val pulseInterval = when (state) {
+            LiveSession.State.SPEAKING   -> 16
+            LiveSession.State.LISTENING  -> 55
+            LiveSession.State.THINKING   -> 30
+            LiveSession.State.CONNECTING -> 25
+            else -> 90
+        }
+        if (tick - lastPulseTick > pulseInterval && baseR > 0f) {
+            pulseWaves += PulseWave(baseR * 0.55f, 1f, 1.4f)
+            lastPulseTick = tick
+        }
+        for (w in pulseWaves) { w.r += 2.4f; w.alpha -= 0.014f }
+        pulseWaves.removeAll { it.alpha <= 0f }
+
+        // Orbit dots
+        if (orbits.size < 22 && baseR > 0f) {
+            orbits += OrbitDot(
+                ang = Random.nextFloat() * 360f,
+                rad = baseR * (1.05f + Random.nextFloat() * 1.20f),
+                speed = 0.4f + Random.nextFloat() * 1.4f,
+                life = 1f
+            )
+        }
+        for (p in orbits) { p.ang = (p.ang + p.speed) % 360f; p.life -= 0.0035f }
+        orbits.removeAll { it.life <= 0f }
+
+        // Edge data stream (matrix-style hex rain)
+        if (tick % 3 == 0 && width > 0) {
+            val onLeft = Random.nextBoolean()
+            edgeDigits += DataDigit(
+                x = if (onLeft) 6f + Random.nextFloat() * 14f else width - 22f - Random.nextFloat() * 14f,
+                y = -14f,
+                ch = hexChars.random(),
+                alpha = 90 + Random.nextInt(120),
+                fall = 1.4f + Random.nextFloat() * 2.2f,
+                size = 10f + Random.nextFloat() * 2f
+            )
+        }
+        for (d in edgeDigits) { d.y += d.fall; d.alpha -= 1 }
+        edgeDigits.removeAll { it.alpha <= 0 || it.y > height + 20f }
+
+        // Lightning arcs between hex vertices when SPEAKING
+        if (state == LiveSession.State.SPEAKING && tick % 7 == 0 && baseR > 0f) {
+            val hexR = baseR * 0.54f * 0.52f
+            val a1 = Random.nextInt(6)
+            val a2 = (a1 + 2 + Random.nextInt(3)) % 6
+            val ang1 = (a1 * 60f - 30f + ringAngles[0] * 0.3f) * PI.toFloat() / 180f
+            val ang2 = (a2 * 60f - 30f + ringAngles[0] * 0.3f) * PI.toFloat() / 180f
+            arcs += Arc(
+                cx + cos(ang1) * hexR, cy + sin(ang1) * hexR,
+                cx + cos(ang2) * hexR, cy + sin(ang2) * hexR,
+                1f, Random.nextInt()
+            )
+        }
+        for (a in arcs) a.life -= 0.10f
+        arcs.removeAll { it.life <= 0f }
+    }
+
+    // ── Draw ───────────────────────────────────────────────────────────
     override fun onDraw(canvas: Canvas) {
         val w = width.toFloat(); val h = height.toFloat()
         cx = w / 2f; cy = h * 0.40f
         baseR = min(w, h) * 0.30f
-        val col = colorForState()
-        val (r, g, b) = decompose(col)
 
+        currentColor = colorForState()
+        val tweened = tweenedColor()
+        val (r, g, b) = decompose(tweened)
+        val bp = bootProgress()
+
+        // Background layers (always drawn)
         drawGrid(canvas, w, h, r, g, b)
-        drawCornerBrackets(canvas, w, h, col, r, g, b)
-        drawTopBar(canvas, w, r, g, b)
-        drawSideData(canvas, w, r, g, b)
-        drawScanSweep(canvas, r, g, b)
-        drawTickMarks(canvas, r, g, b)
-        drawRings(canvas, r, g, b)
-        drawCore(canvas, col, r, g, b)
-        drawWaveform(canvas, r, g, b)
-        drawSparks(canvas, r, g, b)
-        drawStateLabel(canvas, col, r, g, b)
+        drawScanlines(canvas, w, h, r, g, b)
+        drawEdgeDataStream(canvas, r, g, b)
+
+        // Main HUD content (fades in during boot)
+        val hudFade = ((bp - 0.40f) / 0.55f).coerceIn(0f, 1f)
+        if (hudFade > 0.01f) {
+            canvas.saveLayerAlpha(0f, 0f, w, h, (255 * hudFade).toInt())
+            drawCornerBrackets(canvas, w, h, tweened, r, g, b)
+            drawTopBar(canvas, w, r, g, b)
+            drawSideData(canvas, w, r, g, b)
+            drawScanSweep(canvas, r, g, b)
+            drawTickMarks(canvas, r, g, b)
+            drawPulseWaves(canvas, r, g, b)
+            drawOrbits(canvas, r, g, b)
+            drawRings(canvas, r, g, b)
+            drawCore(canvas, tweened, r, g, b)
+            drawArcs(canvas, r, g, b)
+            drawWaveform(canvas, r, g, b)
+            drawSparks(canvas, r, g, b)
+            drawStateLabel(canvas, tweened, r, g, b)
+            canvas.restore()
+        }
+
+        // Boot overlay last (above everything)
+        if (bp < 1f) drawBootOverlay(canvas, w, h, bp, r, g, b)
     }
 
+    // ── Boot overlay ───────────────────────────────────────────────────
+    private fun bootProgress(): Float {
+        val elapsed = System.currentTimeMillis() - bootStartMs
+        return (elapsed.toFloat() / bootDurationMs).coerceIn(0f, 1f)
+    }
+
+    private fun drawBootOverlay(canvas: Canvas, w: Float, h: Float, p: Float, r: Int, g: Int, b: Int) {
+        // Black mask that fades out
+        if (p < 0.45f) {
+            val maskAlpha = (255 * (1f - p / 0.45f).coerceIn(0f, 1f)).toInt()
+            canvas.drawColor(Color.argb(maskAlpha, 0, 6, 10))
+        }
+
+        // Phase A: bright center spark expanding (0..0.20)
+        if (p < 0.22f) {
+            val pp = p / 0.22f
+            val coreA = (255 * (1f - pp * 0.6f)).toInt()
+            // Bright white core
+            pFill.color = Color.argb(coreA, 255, 255, 255)
+            canvas.drawCircle(cx, cy, 4f + pp * 10f, pFill)
+            // Cyan glow halo
+            for (i in 1..6) {
+                pFill.color = Color.argb(((coreA - i * 28).coerceAtLeast(0)), r, g, b)
+                canvas.drawCircle(cx, cy, 6f + pp * (15f + i * 6f), pFill)
+            }
+        }
+
+        // Phase B: shockwave rings (0.10..0.55)
+        if (p in 0.10f..0.60f) {
+            val pp = ((p - 0.10f) / 0.50f).coerceIn(0f, 1f)
+            for (i in 0 until 5) {
+                val pi = pp - i * 0.10f
+                if (pi <= 0f || pi > 1f) continue
+                val rr = pi * baseR * 2.6f
+                val a = ((1f - pi) * 200f).toInt().coerceIn(0, 255)
+                pStroke.strokeWidth = 2f
+                pStroke.pathEffect = null
+                pStroke.color = Color.argb(a, r, g, b)
+                canvas.drawCircle(cx, cy, rr, pStroke)
+            }
+        }
+
+        // Phase C: horizontal scan line sweep top→bottom (0.25..0.65)
+        if (p in 0.25f..0.65f) {
+            val pp = (p - 0.25f) / 0.40f
+            val y = pp * h
+            // Bright line
+            pStroke.strokeWidth = 2f
+            pStroke.color = Color.argb(220, r, g, b)
+            canvas.drawLine(0f, y, w, y, pStroke)
+            // Glow halo above and below
+            for (i in 1..7) {
+                val a = (60 - i * 7).coerceAtLeast(0)
+                pStroke.color = Color.argb(a, r, g, b)
+                pStroke.strokeWidth = (i * 1.6f)
+                canvas.drawLine(0f, y - i * 2.5f, w, y - i * 2.5f, pStroke)
+                canvas.drawLine(0f, y + i * 2.5f, w, y + i * 2.5f, pStroke)
+            }
+        }
+
+        // Phase D: typewriter status messages (0.20..1.00)
+        if (p > 0.20f) {
+            val pp = ((p - 0.20f) / 0.80f).coerceIn(0f, 1f)
+            pText.textAlign = Paint.Align.LEFT
+            pText.textSize = 13f
+            pText.typeface = Typeface.MONOSPACE
+
+            val totalChars = bootMessages.sumOf { it.length + 1 }
+            val charsToShow = (pp * totalChars).toInt()
+            var consumed = 0
+            val baseY = h * 0.62f
+
+            for ((i, msg) in bootMessages.withIndex()) {
+                val nMsg = (charsToShow - consumed).coerceIn(0, msg.length)
+                if (nMsg > 0) {
+                    val lineY = baseY + i * 22f
+                    val sub = msg.substring(0, nMsg)
+                    val complete = nMsg == msg.length
+                    val color = if (complete) Color.argb(220, r, g, b) else Color.argb(210, 255, 255, 255)
+                    pText.color = color
+                    canvas.drawText(sub, 32f, lineY, pText)
+                    if (!complete && (tick / 6) % 2 == 0) {
+                        // Blinking caret
+                        val cw = pText.measureText(sub)
+                        pFill.color = Color.argb(220, 255, 255, 255)
+                        canvas.drawRect(32f + cw + 2f, lineY - 11f, 32f + cw + 9f, lineY + 2f, pFill)
+                    }
+                }
+                consumed += msg.length + 1
+                if (consumed > charsToShow) break
+            }
+        }
+
+        // Phase E: title card "J.A.R.V.I.S." pulsing (last 30%)
+        if (p > 0.65f) {
+            val pp = ((p - 0.65f) / 0.35f).coerceIn(0f, 1f)
+            val a = (255 * pp * pp).toInt()
+            pTextC.textAlign = Paint.Align.CENTER
+            pTextC.textSize = 36f * (0.85f + pp * 0.15f)
+            pTextC.color = Color.argb(a, r, g, b)
+            canvas.drawText("J.A.R.V.I.S.", cx, cy - baseR * 0.05f, pTextC)
+            pTextC.textSize = 12f
+            pTextC.color = Color.argb((a * 0.6f).toInt(), 255, 255, 255)
+            canvas.drawText("MARK V  •  NEURAL LINK ESTABLISHED", cx, cy + 22f, pTextC)
+        }
+    }
+
+    // ── Background layers ──────────────────────────────────────────────
     private fun drawGrid(canvas: Canvas, w: Float, h: Float, r: Int, g: Int, b: Int) {
         pStroke.color = Color.argb(14, r, g, b)
         pStroke.strokeWidth = 0.7f; pStroke.pathEffect = null
@@ -107,27 +331,40 @@ class HudView @JvmOverloads constructor(
         var y = 0f; while (y <= h) { canvas.drawLine(0f, y, w, y, pStroke); y += step }
     }
 
+    private fun drawScanlines(canvas: Canvas, w: Float, h: Float, r: Int, g: Int, b: Int) {
+        pStroke.strokeWidth = 1f
+        pStroke.pathEffect = null
+        pStroke.color = Color.argb(10, r, g, b)
+        val offset = (tick * 0.5f) % 6f
+        var y = -offset
+        while (y < h) { canvas.drawLine(0f, y, w, y, pStroke); y += 6f }
+    }
+
+    private fun drawEdgeDataStream(canvas: Canvas, r: Int, g: Int, b: Int) {
+        pText.textAlign = Paint.Align.LEFT
+        for (d in edgeDigits) {
+            pText.textSize = d.size
+            pText.color = Color.argb(d.alpha.coerceIn(0, 255), r, g, b)
+            canvas.drawText(d.ch.toString(), d.x, d.y, pText)
+        }
+    }
+
+    // ── Foreground layers ──────────────────────────────────────────────
     private fun drawCornerBrackets(canvas: Canvas, w: Float, h: Float, col: Int, r: Int, g: Int, b: Int) {
         val len = 58f; val pad = 24f
         pStroke.strokeWidth = 2.8f; pStroke.pathEffect = null
         pStroke.color = Color.argb(210, r, g, b)
-        // TL
         canvas.drawLine(pad, pad + len, pad, pad, pStroke)
         canvas.drawLine(pad, pad, pad + len, pad, pStroke)
-        // TR
         canvas.drawLine(w - pad - len, pad, w - pad, pad, pStroke)
         canvas.drawLine(w - pad, pad, w - pad, pad + len, pStroke)
-        // BL
         canvas.drawLine(pad, h - pad - len, pad, h - pad, pStroke)
         canvas.drawLine(pad, h - pad, pad + len, h - pad, pStroke)
-        // BR
         canvas.drawLine(w - pad - len, h - pad, w - pad, h - pad, pStroke)
         canvas.drawLine(w - pad, h - pad, w - pad, h - pad - len, pStroke)
-        // Corner dots
         pFill.color = col
         for ((px, py) in listOf(pad to pad, w - pad to pad, pad to h - pad, w - pad to h - pad))
             canvas.drawCircle(px, py, 3.5f, pFill)
-        // Corner micro-labels
         pText.textAlign = Paint.Align.LEFT
         pText.textSize = 11f
         pText.color = Color.argb(100, r, g, b)
@@ -141,12 +378,10 @@ class HudView @JvmOverloads constructor(
         pStroke.color = Color.argb(80, r, g, b)
         pStroke.strokeWidth = 1f; pStroke.pathEffect = null
         canvas.drawLine(0f, 82f, w, 82f, pStroke)
-
         pText.textAlign = Paint.Align.LEFT
         pText.textSize = 20f
         pText.color = Color.argb(210, r, g, b)
         canvas.drawText("J.A.R.V.I.S  NEURAL LINK", 92f, 62f, pText)
-
         pText.textAlign = Paint.Align.RIGHT
         pText.textSize = 14f
         pText.color = Color.argb(130, r, g, b)
@@ -196,6 +431,33 @@ class HudView @JvmOverloads constructor(
         }
     }
 
+    private fun drawPulseWaves(canvas: Canvas, r: Int, g: Int, b: Int) {
+        for (w in pulseWaves) {
+            val a = (w.alpha * 130).toInt().coerceIn(0, 255)
+            pStroke.strokeWidth = w.width
+            pStroke.pathEffect = null
+            pStroke.color = Color.argb(a, r, g, b)
+            canvas.drawCircle(cx, cy, w.r, pStroke)
+        }
+    }
+
+    private fun drawOrbits(canvas: Canvas, r: Int, g: Int, b: Int) {
+        for (p in orbits) {
+            val a = (p.life * 200).toInt().coerceIn(0, 255)
+            val ang = p.ang * PI.toFloat() / 180f
+            pFill.color = Color.argb(a, r, g, b)
+            canvas.drawCircle(cx + cos(ang) * p.rad, cy + sin(ang) * p.rad, 1.9f, pFill)
+            // Trail
+            for (i in 1..4) {
+                val ta = ((p.life - i * 0.10f) * 110).toInt().coerceIn(0, 200)
+                if (ta <= 0) break
+                val tang = (p.ang - i * p.speed * 1.6f) * PI.toFloat() / 180f
+                pFill.color = Color.argb(ta, r, g, b)
+                canvas.drawCircle(cx + cos(tang) * p.rad, cy + sin(tang) * p.rad, 1.2f, pFill)
+            }
+        }
+    }
+
     private fun drawRings(canvas: Canvas, r: Int, g: Int, b: Int) {
         data class Ring(val radius: Float, val segs: Int, val sweep: Float, val alpha: Int, val w: Float, val ai: Int)
         val rings = listOf(
@@ -217,13 +479,11 @@ class HudView @JvmOverloads constructor(
     }
 
     private fun drawCore(canvas: Canvas, col: Int, r: Int, g: Int, b: Int) {
-        // Outer glow layers
         for (l in 6 downTo 1) {
             val lr = baseR * (0.60f + l * 0.14f)
             pFill.color = Color.argb((4 + l * 5 + (pulse * 8).toInt()).coerceAtMost(255), r, g, b)
             canvas.drawCircle(cx, cy, lr, pFill)
         }
-        // Core with radial gradient
         val coreR = baseR * (0.54f + pulse * 0.04f)
         val shader = RadialGradient(cx, cy, coreR,
             intArrayOf(
@@ -235,12 +495,8 @@ class HudView @JvmOverloads constructor(
         pFill.shader = shader
         canvas.drawCircle(cx, cy, coreR, pFill)
         pFill.shader = null
-
-        // Core outline ring
         pStroke.color = col; pStroke.strokeWidth = 2.2f; pStroke.pathEffect = null
         canvas.drawCircle(cx, cy, coreR, pStroke)
-
-        // Rotating inner hexagon
         val hexPath = Path()
         val hexR = coreR * 0.52f
         for (i in 0 until 6) {
@@ -251,15 +507,11 @@ class HudView @JvmOverloads constructor(
         hexPath.close()
         pStroke.color = Color.argb(110, r, g, b); pStroke.strokeWidth = 1f
         canvas.drawPath(hexPath, pStroke)
-
-        // Hex vertices as small dots
         pFill.color = Color.argb(140, r, g, b)
         for (i in 0 until 6) {
             val ang = (i * 60f - 30f + ringAngles[0] * 0.3f) * PI.toFloat() / 180f
             canvas.drawCircle(cx + cos(ang) * hexR, cy + sin(ang) * hexR, 2.5f, pFill)
         }
-
-        // Center crosshair
         pStroke.color = Color.argb(170, r, g, b); pStroke.strokeWidth = 1.5f
         val cr = coreR * 0.19f
         canvas.drawLine(cx - cr, cy, cx + cr, cy, pStroke)
@@ -268,18 +520,48 @@ class HudView @JvmOverloads constructor(
         canvas.drawCircle(cx, cy, 3.5f, pFill)
     }
 
+    private fun drawArcs(canvas: Canvas, r: Int, g: Int, b: Int) {
+        for (a in arcs) {
+            val al = (a.life * 255).toInt().coerceIn(0, 255)
+            val rng = Random(a.seed + (tick / 2))
+            val path = Path()
+            path.moveTo(a.x1, a.y1)
+            val segs = 5
+            for (i in 1 until segs) {
+                val t = i.toFloat() / segs
+                val mx = a.x1 + (a.x2 - a.x1) * t + (rng.nextFloat() - 0.5f) * 14f
+                val my = a.y1 + (a.y2 - a.y1) * t + (rng.nextFloat() - 0.5f) * 14f
+                path.lineTo(mx, my)
+            }
+            path.lineTo(a.x2, a.y2)
+            // Glow halo
+            pStroke.color = Color.argb((al * 0.45f).toInt(), r, g, b)
+            pStroke.strokeWidth = 7f
+            canvas.drawPath(path, pStroke)
+            // Bright bolt
+            pStroke.color = Color.argb(al, 255, 255, 255)
+            pStroke.strokeWidth = 2.4f
+            canvas.drawPath(path, pStroke)
+        }
+    }
+
     private fun drawWaveform(canvas: Canvas, r: Int, g: Int, b: Int) {
-        val waveW = baseR * 2.0f
-        val barMaxH = baseR * 0.26f
-        val baseY = cy + baseR * 0.76f
+        val waveW = baseR * 2.2f
+        val barMaxH = baseR * 0.30f
+        val baseY = cy + baseR * 0.78f
         val startX = cx - waveW / 2f
-        val slotW = waveW / 32f
-        pFill.color = Color.argb(155, r, g, b)
-        for (i in 0 until 32) {
-            val amp = waveform[(waveIdx + i) % 32]
+        val slotW = waveW / 48f
+        for (i in 0 until 48) {
+            val amp = waveform[(waveIdx + i) % 48]
             val bh = (amp * barMaxH).coerceAtLeast(1.5f)
             val x = startX + i * slotW
+            // Mirrored bars with vertical gradient
+            val grad = LinearGradient(0f, baseY - bh, 0f, baseY + bh,
+                Color.argb(60, r, g, b), Color.argb(220, r, g, b),
+                Shader.TileMode.CLAMP)
+            pFill.shader = grad
             canvas.drawRoundRect(RectF(x + 1f, baseY - bh, x + slotW - 1f, baseY + bh), 2f, 2f, pFill)
+            pFill.shader = null
         }
     }
 
@@ -301,16 +583,14 @@ class HudView @JvmOverloads constructor(
             LiveSession.State.MUTED       -> "MUTED"
             LiveSession.State.ERROR       -> "ERROR"
         }
-        val labelY = cy + baseR * 1.14f
+        val labelY = cy + baseR * 1.18f
+        pTextC.textAlign = Paint.Align.CENTER
         pTextC.textSize = 22f; pTextC.color = col
         canvas.drawText(label, cx, labelY, pTextC)
-
-        // Side decorators
         val half = pTextC.measureText(label) / 2f + 18f
         pStroke.color = Color.argb(90, r, g, b); pStroke.strokeWidth = 1f
-        canvas.drawLine(cx - baseR * 1.1f, labelY - 5f, cx - half, labelY - 5f, pStroke)
-        canvas.drawLine(cx + half, labelY - 5f, cx + baseR * 1.1f, labelY - 5f, pStroke)
-        // Small diamond decorators
+        canvas.drawLine(cx - baseR * 1.15f, labelY - 5f, cx - half, labelY - 5f, pStroke)
+        canvas.drawLine(cx + half, labelY - 5f, cx + baseR * 1.15f, labelY - 5f, pStroke)
         val dx = half - 6f
         pFill.color = Color.argb(140, r, g, b)
         drawDiamond(canvas, cx - dx, labelY - 5f, 4f)
@@ -324,6 +604,7 @@ class HudView @JvmOverloads constructor(
         canvas.drawPath(path, pFill)
     }
 
+    // ── Color helpers ──────────────────────────────────────────────────
     private fun colorForState(): Int = when (state) {
         LiveSession.State.IDLE        -> 0xFF3A8A9A.toInt()
         LiveSession.State.CONNECTING  -> 0xFFFFCC00.toInt()
@@ -332,6 +613,18 @@ class HudView @JvmOverloads constructor(
         LiveSession.State.SPEAKING    -> 0xFF00FF88.toInt()
         LiveSession.State.MUTED       -> 0xFFFF3366.toInt()
         LiveSession.State.ERROR       -> 0xFFFF3355.toInt()
+    }
+
+    private fun tweenedColor(): Int {
+        val t = ((System.currentTimeMillis() - colorTweenStart).toFloat() / colorTweenMs).coerceIn(0f, 1f)
+        if (t >= 1f) return currentColor
+        val (r1, g1, b1) = decompose(prevColor)
+        val (r2, g2, b2) = decompose(currentColor)
+        val ease = (1f - cos(t * PI.toFloat())) / 2f
+        val r = (r1 + (r2 - r1) * ease).toInt()
+        val g = (g1 + (g2 - g1) * ease).toInt()
+        val bl = (b1 + (b2 - b1) * ease).toInt()
+        return Color.argb(255, r, g, bl)
     }
 
     private fun decompose(c: Int) = Triple(Color.red(c), Color.green(c), Color.blue(c))
