@@ -25,15 +25,20 @@ class LiveSession(
     interface Callbacks {
         fun onState(state: State)
         fun onLog(line: String)
+        /** Streamed conversation entries. partial=true means "still being filled in". */
+        fun onTranscript(speaker: Speaker, text: String, partial: Boolean)
     }
 
     enum class State { IDLE, CONNECTING, LISTENING, THINKING, SPEAKING, MUTED, ERROR }
+    enum class Speaker { USER, JARVIS }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var client: GeminiLiveClient? = null
     private var audio:  AudioIO? = null
     private var welcomeSent = false
     private var reconnectJob: Job? = null
+    private val userBuf = StringBuilder()
+    private val jarvisBuf = StringBuilder()
 
     fun start() {
         callbacks.onState(State.CONNECTING)
@@ -60,9 +65,14 @@ class LiveSession(
     fun isMuted(): Boolean = audio?.muted == true
 
     fun sendText(text: String) {
-        callbacks.onLog("Sen: $text")
+        callbacks.onTranscript(Speaker.USER, text, partial = false)
         client?.sendUserText(text)
         callbacks.onState(State.THINKING)
+    }
+
+    /** Internal-only: send a system instruction to the model that should NOT show in chat. */
+    private fun sendInternalInstruction(text: String) {
+        client?.sendUserText(text)
     }
 
     private fun connect() {
@@ -105,7 +115,7 @@ class LiveSession(
             callbacks.onLog("SYS: Welcome → $msg")
             val instr = "Asagidaki cumleyi aynen, hicbir ekleme yapmadan, sicak " +
                         "bir tonla seslendir:\n\"$msg\""
-            client?.sendUserText(instr)
+            sendInternalInstruction(instr)
         }
     }
 
@@ -128,15 +138,29 @@ class LiveSession(
     }
 
     override fun onInputTranscript(text: String) {
-        scope.launch { callbacks.onLog("Sen: $text") }
+        scope.launch {
+            userBuf.append(text)
+            callbacks.onTranscript(Speaker.USER, userBuf.toString(), partial = true)
+        }
     }
 
     override fun onOutputTranscript(text: String) {
-        scope.launch { callbacks.onLog("Jarvis: $text") }
+        scope.launch {
+            jarvisBuf.append(text)
+            callbacks.onTranscript(Speaker.JARVIS, jarvisBuf.toString(), partial = true)
+        }
     }
 
     override fun onTurnComplete() {
         scope.launch {
+            if (userBuf.isNotEmpty()) {
+                callbacks.onTranscript(Speaker.USER, userBuf.toString(), partial = false)
+                userBuf.clear()
+            }
+            if (jarvisBuf.isNotEmpty()) {
+                callbacks.onTranscript(Speaker.JARVIS, jarvisBuf.toString(), partial = false)
+                jarvisBuf.clear()
+            }
             audio?.endOfTurn()
             if (audio?.muted != true) callbacks.onState(State.LISTENING)
             if (ShutdownTool.requested) {
