@@ -54,15 +54,16 @@ class SetupActivity : AppCompatActivity() {
 
     private fun openWallpaperPicker() {
         val component = ComponentName(this, JarvisWallpaperService::class.java)
-        // Try the direct preview flow first; fall back to the live wallpaper
-        // chooser if the OEM doesn't honor the extra.
+        // Direct preview flow targeting the JARVIS engine.
         val direct = Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER)
             .putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT, component)
         if (direct.resolveActivity(packageManager) != null) {
             startActivity(direct)
             return
         }
-        val chooser = Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER)
+        // Fallback: open the system live wallpaper chooser (action string is
+        // not exposed as a constant in WallpaperManager on all API levels).
+        val chooser = Intent("android.service.wallpaper.LIVE_WALLPAPER_CHOOSER")
         if (chooser.resolveActivity(packageManager) != null) {
             startActivity(chooser)
             return

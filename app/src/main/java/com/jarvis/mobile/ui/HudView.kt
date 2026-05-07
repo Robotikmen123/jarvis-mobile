@@ -17,7 +17,7 @@ class HudView @JvmOverloads constructor(
 
     private val renderer = HudRenderer(playBootIntro = true)
 
-    @Volatile var state: LiveSession.State
+    var state: LiveSession.State
         get() = renderer.state
         set(value) { renderer.state = value }
 
