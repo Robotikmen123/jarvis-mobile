@@ -80,5 +80,15 @@
             android:layout_width="match_parent"
             android:layout_height="56dp"
             android:layout_marginTop="28dp" />
+
+        <Button
+            android:id="@+id/btnWallpaper"
+            android:text="@string/setup_set_wallpaper"
+            android:textColor="@color/primary"
+            android:textStyle="bold"
+            android:background="@android:color/transparent"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="14dp" />
     </LinearLayout>
 </ScrollView>

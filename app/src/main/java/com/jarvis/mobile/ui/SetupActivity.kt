@@ -1,14 +1,18 @@
 package com.jarvis.mobile.ui
 
+import android.app.WallpaperManager
+import android.content.ComponentName
 import android.content.Intent
 import android.os.Bundle
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
 import android.widget.Spinner
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.jarvis.mobile.R
 import com.jarvis.mobile.config.ConfigStore
+import com.jarvis.mobile.wallpaper.JarvisWallpaperService
 
 class SetupActivity : AppCompatActivity() {
 
@@ -20,10 +24,11 @@ class SetupActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_setup)
 
-        val etGemini    = findViewById<EditText>(R.id.etGemini)
-        val etAnthropic = findViewById<EditText>(R.id.etAnthropic)
-        val spVoice     = findViewById<Spinner>(R.id.spVoice)
-        val btnSave     = findViewById<Button>(R.id.btnSave)
+        val etGemini      = findViewById<EditText>(R.id.etGemini)
+        val etAnthropic   = findViewById<EditText>(R.id.etAnthropic)
+        val spVoice       = findViewById<Spinner>(R.id.spVoice)
+        val btnSave       = findViewById<Button>(R.id.btnSave)
+        val btnWallpaper  = findViewById<Button>(R.id.btnWallpaper)
 
         etGemini.setText(ConfigStore.geminiKey(this).orEmpty())
         etAnthropic.setText(ConfigStore.anthropicKey(this).orEmpty())
@@ -43,5 +48,25 @@ class SetupActivity : AppCompatActivity() {
             startActivity(Intent(this, MainActivity::class.java))
             finish()
         }
+
+        btnWallpaper.setOnClickListener { openWallpaperPicker() }
+    }
+
+    private fun openWallpaperPicker() {
+        val component = ComponentName(this, JarvisWallpaperService::class.java)
+        // Try the direct preview flow first; fall back to the live wallpaper
+        // chooser if the OEM doesn't honor the extra.
+        val direct = Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER)
+            .putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT, component)
+        if (direct.resolveActivity(packageManager) != null) {
+            startActivity(direct)
+            return
+        }
+        val chooser = Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER)
+        if (chooser.resolveActivity(packageManager) != null) {
+            startActivity(chooser)
+            return
+        }
+        Toast.makeText(this, "Canlı duvar kağıdı seçici bulunamadı.", Toast.LENGTH_LONG).show()
     }
 }

@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">JARVIS</string>
+    <string name="wallpaper_label">JARVIS HUD</string>
+    <string name="wallpaper_author">JARVIS Mobile</string>
+    <string name="wallpaper_description">Iron Man HUD: animated rings, pulse waves, hex matrix rain, holographic scan lines.</string>
+    <string name="setup_set_wallpaper">JARVIS\'I DUVAR KAGIDI YAP</string>
 </resources>
