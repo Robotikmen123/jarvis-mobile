@@ -18,7 +18,10 @@ class JarvisWallpaperService : WallpaperService() {
     private inner class JarvisEngine : Engine() {
         // Wallpaper has no boot intro — it shouldn't replay every time the
         // engine wakes up. Just the ambient HUD.
-        private val renderer = HudRenderer(playBootIntro = false).apply {
+        private val renderer = HudRenderer(
+            playBootIntro = false,
+            showChrome = false,
+        ).apply {
             state = LiveSession.State.LISTENING
         }
 
@@ -56,16 +59,15 @@ class JarvisWallpaperService : WallpaperService() {
             val holder = surfaceHolder
             var canvas: android.graphics.Canvas? = null
             try {
-                canvas = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O)
-                    holder.lockHardwareCanvas()
-                else
-                    holder.lockCanvas()
+                // Software canvas (lockCanvas) — slower than lockHardwareCanvas
+                // but reliable for layer ops + gradients across all devices.
+                canvas = holder.lockCanvas()
                 if (canvas != null) {
                     renderer.step()
-                    renderer.draw(canvas, width, height)
+                    renderer.draw(canvas, canvas.width, canvas.height)
                 }
             } catch (_: Throwable) {
-                // Surface might have been destroyed mid-frame; bail silently.
+                // Surface destroyed mid-frame; bail silently.
             } finally {
                 if (canvas != null) {
                     try { holder.unlockCanvasAndPost(canvas) } catch (_: Throwable) {}

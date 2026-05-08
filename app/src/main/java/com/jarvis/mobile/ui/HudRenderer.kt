@@ -10,7 +10,13 @@ import kotlin.random.Random
  * single frame onto any [Canvas]. Used by [HudView] and by the live wallpaper
  * service so both share the exact same look.
  */
-class HudRenderer(private val playBootIntro: Boolean = true) {
+class HudRenderer(
+    private val playBootIntro: Boolean = true,
+    /** When false, hides text chrome (top bar text, side data, state label,
+     *  corner code labels) so the renderer is purely visual — used for the
+     *  live wallpaper. */
+    private val showChrome: Boolean = true,
+) {
 
     var state: LiveSession.State = LiveSession.State.IDLE
         set(value) {
@@ -177,11 +183,12 @@ class HudRenderer(private val playBootIntro: Boolean = true) {
         drawEdgeDataStream(canvas, r, g, b)
 
         val hudFade = ((bp - 0.40f) / 0.55f).coerceIn(0f, 1f)
+        val needsLayer = hudFade in 0.01f..0.99f
         if (hudFade > 0.01f) {
-            canvas.saveLayerAlpha(0f, 0f, wf, hf, (255 * hudFade).toInt())
+            if (needsLayer) canvas.saveLayerAlpha(0f, 0f, wf, hf, (255 * hudFade).toInt())
             drawCornerBrackets(canvas, wf, hf, tweened, r, g, b)
             drawTopBar(canvas, wf, r, g, b)
-            drawSideData(canvas, wf, r, g, b)
+            if (showChrome) drawSideData(canvas, wf, r, g, b)
             drawScanSweep(canvas, r, g, b)
             drawTickMarks(canvas, r, g, b)
             drawPulseWaves(canvas, r, g, b)
@@ -191,8 +198,8 @@ class HudRenderer(private val playBootIntro: Boolean = true) {
             drawArcs(canvas, r, g, b)
             drawWaveform(canvas, r, g, b)
             drawSparks(canvas, r, g, b)
-            drawStateLabel(canvas, tweened, r, g, b)
-            canvas.restore()
+            if (showChrome) drawStateLabel(canvas, tweened, r, g, b)
+            if (needsLayer) canvas.restore()
         }
 
         if (playBootIntro && bp < 1f) drawBootOverlay(canvas, wf, hf, bp, r, g, b)
@@ -327,19 +334,22 @@ class HudRenderer(private val playBootIntro: Boolean = true) {
         pFill.color = col
         for ((px, py) in listOf(pad to pad, w - pad to pad, pad to h - pad, w - pad to h - pad))
             canvas.drawCircle(px, py, 3.5f, pFill)
-        pText.textAlign = Paint.Align.LEFT
-        pText.textSize = 11f
-        pText.color = Color.argb(100, r, g, b)
-        canvas.drawText("00°N 00°E", pad + 8f, pad + 18f, pText)
-        pText.textAlign = Paint.Align.RIGHT
-        canvas.drawText("MARK V", w - pad - 8f, pad + 18f, pText)
-        pText.textAlign = Paint.Align.LEFT
+        if (showChrome) {
+            pText.textAlign = Paint.Align.LEFT
+            pText.textSize = 11f
+            pText.color = Color.argb(100, r, g, b)
+            canvas.drawText("00°N 00°E", pad + 8f, pad + 18f, pText)
+            pText.textAlign = Paint.Align.RIGHT
+            canvas.drawText("MARK V", w - pad - 8f, pad + 18f, pText)
+            pText.textAlign = Paint.Align.LEFT
+        }
     }
 
     private fun drawTopBar(canvas: Canvas, w: Float, r: Int, g: Int, b: Int) {
         pStroke.color = Color.argb(80, r, g, b)
         pStroke.strokeWidth = 1f; pStroke.pathEffect = null
         canvas.drawLine(0f, 82f, w, 82f, pStroke)
+        if (!showChrome) return
         pText.textAlign = Paint.Align.LEFT
         pText.textSize = 20f
         pText.color = Color.argb(210, r, g, b)
