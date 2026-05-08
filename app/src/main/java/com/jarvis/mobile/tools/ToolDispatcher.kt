@@ -17,6 +17,23 @@ object ToolDispatcher {
         YouTubeTool,
         SaveMemoryTool,
         ShutdownTool,
+        // Hardware controls
+        VolumeTool,
+        BrightnessTool,
+        FlashlightTool,
+        BatteryTool,
+        DndTool,
+        VibrateTool,
+        // Intent helpers
+        CallTool,
+        CalendarTool,
+        TimerTool,
+        AlarmTool,
+        CameraTool,
+        ClipboardTool,
+        NotesTool,
+        PhoneStatusTool,
+        SettingsTool,
     ).associateBy { it.name }
 
     fun declarationsJson(): JsonObject {

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <shortcut
+        android:shortcutId="open_jarvis"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_open_short"
+        android:shortcutLongLabel="@string/shortcut_open_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.jarvis.mobile"
+            android:targetClass="com.jarvis.mobile.ui.MainActivity" />
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="open_setup"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_setup_short"
+        android:shortcutLongLabel="@string/shortcut_setup_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.jarvis.mobile"
+            android:targetClass="com.jarvis.mobile.ui.SetupActivity" />
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="set_wallpaper"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_wallpaper_short"
+        android:shortcutLongLabel="@string/shortcut_wallpaper_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.jarvis.mobile"
+            android:targetClass="com.jarvis.mobile.ui.SetupActivity" />
+    </shortcut>
+
+</shortcuts>

@@ -5,4 +5,13 @@
     <string name="wallpaper_author">JARVIS Mobile</string>
     <string name="wallpaper_description">Iron Man HUD: animated rings, pulse waves, hex matrix rain, holographic scan lines.</string>
     <string name="setup_set_wallpaper">JARVIS\'I DUVAR KAGIDI YAP</string>
+
+    <string name="tile_label">JARVIS</string>
+
+    <string name="shortcut_open_short">Aç</string>
+    <string name="shortcut_open_long">JARVIS\'i aç</string>
+    <string name="shortcut_setup_short">Ayarlar</string>
+    <string name="shortcut_setup_long">Ayarları aç</string>
+    <string name="shortcut_wallpaper_short">Wallpaper</string>
+    <string name="shortcut_wallpaper_long">Duvar kağıdını ayarla</string>
 </resources>
