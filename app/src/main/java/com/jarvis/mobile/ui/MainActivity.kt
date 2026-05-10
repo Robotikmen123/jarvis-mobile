@@ -86,7 +86,10 @@ class MainActivity : AppCompatActivity(), LiveSession.Callbacks {
     }
 
     private fun ensurePermissionsAndStart() {
-        val needed = mutableListOf(Manifest.permission.RECORD_AUDIO)
+        val needed = mutableListOf(
+            Manifest.permission.RECORD_AUDIO,
+            Manifest.permission.READ_CONTACTS,
+        )
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             needed += Manifest.permission.POST_NOTIFICATIONS
         }

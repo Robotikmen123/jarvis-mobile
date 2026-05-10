@@ -26,6 +26,8 @@ object ToolDispatcher {
         VibrateTool,
         // Intent helpers
         CallTool,
+        CallContactTool,
+        FindContactTool,
         CalendarTool,
         TimerTool,
         AlarmTool,
